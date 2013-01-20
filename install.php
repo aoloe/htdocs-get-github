@@ -11,11 +11,7 @@ $field = array(
     'github_user' => 'GitHub user',
     'github_repository' => 'GitHub repository',
     'github_path' => 'GitHub path',
-    'title' => 'Title',
-    'author' => 'Default author',
     'data_path' => 'Data path',
-    'description' => 'Description',
-    'contact' => 'Contact Email',
 );
 
 $config = array_fill_keys(array_keys($field), '');
@@ -103,7 +99,7 @@ if (!empty($error)) {
 }
 ?>
 <?php if (empty($error) && $config['github_user'] != '') : ?>
-<p>When you're finished with the configuration, you can <a href="update.php">pull the blog articles from your repository</a></p>
+<p>When you're finished with the configuration, you can <a href="update.php">pull the pages from your repository</a></p>
 <?php endif; ?>
 <form method="post">
 <?php foreach($field as $key => $value) : ?>
