@@ -58,13 +58,15 @@ function ensure_directory($path) {
     global $directory;
     $result = true;
     $string = '';
-    foreach (explode('/', $path) as $item) {
-        $string .= $item.'/';
-        if (!array_key_exists($string, $directory)) {
-            $result = is_dir(BLOG_CACHE_PATH.$string);
-            $directory[$string] = $result;
+    if (!array_key_exists($path, $directory)) {
+        foreach (explode('/', $path) as $item) {
+            $string .= $item.'/';
+            if (!array_key_exists($string, $directory)) {
+                $result = is_dir(BLOG_CACHE_PATH.$string);
+                $directory[$string] = $result;
+            }
+            
         }
-        
     }
     return $result;
 } // ensure_directory()
@@ -81,7 +83,7 @@ if (!BLOG_GITHUB_NOREQUEST) {
     echo('<p class="warning">Requests are from the cache: queries to GitHub are disabled.</p>');
     $content_github = file_get_contents("content_github.json");
 }
-$content_github = json_decode($content_github);
+$content_github = json_decode($content_github, true);
 debug('content_github', $content_github);
 
 $content = array();
@@ -102,24 +104,38 @@ $list = array();
 if (is_array($content_github)) {
     $changed = 0;
     foreach ($content_github as $item) {
-        if ($item->type == 'file') {
-            $dirname = pathinfo($item->path, PATHINFO_DIRNAME); // TODO: remove 'content/' which is $config['github_path']
-            $id = $item->path;
+        if ($item['type'] == 'file') {
+            $id = $item['path'];
+            if (!array_key_exists($id, $content)) {
+                $content[$id] = array (
+                    'path' => $item['path'],
+                    'name' => $item['name'],
+                    'id' => $id,
+                    'raw_url' => $config['github_url_raw'].$item['path'],
+                    'sha' => '',
+                );
+            }
+            $dirname = pathinfo($item['path'], PATHINFO_DIRNAME); // TODO: remove 'content/' which is $config['github_path']
             if (ensure_directory($dirname)) {
-                if (!array_key_exists($id, $content)) {
-                    $content[$id] = array (
-                        'path' => $item->path,
-                        'name' => $item->name,
-                        'id' => $id,
-                        'raw_url' => $config['github_url_raw'].$item->path,
-                        'sha' => '',
-                    );
-
+                $content_item = $content[$id];
+                debug('content_item', $content_item);
+                if ($item['sha'] != $content_item['sha']) {
+                    $changed++;
+                    $file = get_content_from_github($content_item['raw_url']);
+                    file_put_contents(BLOG_CACHE_PATH.$content_item['path'], $file);
+                    // debug('file', $file);
+                    $content_item['sha'] = $item['sha'];
                 }
             }
         } // if file
     } // foreach
 } // is_array($content_github)
+debug('directory', $directory);
+foreach ($directory as $key => $value) {
+    if (!$value) {
+        echo("<p class=\"warning\">".BLOG_CACHE_PATH.$key." is not writable</p>\n");
+    }
+}
 ?>
 <form method="post">
 <input type="checkbox" name="force" value="yes" id="force_update" /> <label for="force_update">Force</label>
