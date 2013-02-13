@@ -12,6 +12,7 @@ $field = array(
     'github_repository' => 'GitHub repository',
     'github_path' => 'GitHub path',
     'data_path' => 'Data path',
+    'max_items' => 'Maximum number of items per batch',
 );
 
 $config = array_fill_keys(array_keys($field), '');
@@ -103,7 +104,7 @@ if (!empty($error)) {
 <?php endif; ?>
 <form method="post">
 <?php foreach($field as $key => $value) : ?>
-<p><label for="<?= $key ?>"><?= $value ?></label><input type="text" name="<?= $key ?>" <?= $config[$key] == '' ? '' : ' value="'.$config[$key].'"' ?> id="<?= $key ?>" class="input" /></p>
+<p><label for="<?= $key ?>"><?= $value ?></label><input type="text" name="<?= $key ?>" <?= !array_key_exists($key, $config) || $config[$key] == '' ? '' : ' value="'.$config[$key].'"' ?> id="<?= $key ?>" class="input" /></p>
 <?php endforeach; ?>
 <p><input type="submit" name="install" value="install" /></p>
 </form>

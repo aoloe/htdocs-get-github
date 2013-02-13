@@ -71,11 +71,6 @@ function ensure_directory($path) {
     return $result;
 } // ensure_directory()
 
-$rate_limit = json_decode(get_content_from_github("https://api.github.com/rate_limit"));
-// debug('rate_limit', $rate_limit);
-
-echo("<p>".$rate_limit->rate->remaining." hits remaining out of ".$rate_limit->rate->limit." for the next hour.</p>");
-
 if (!BLOG_GITHUB_NOREQUEST) {
     $content_github = get_content_from_github($config['github_url']);
     file_put_contents("content_github.json", $content_github);
@@ -119,12 +114,15 @@ if (is_array($content_github)) {
             if (ensure_directory($dirname)) {
                 $content_item = $content[$id];
                 debug('content_item', $content_item);
+                debug('item', $item);
                 if ($item['sha'] != $content_item['sha']) {
                     $changed++;
-                    $file = get_content_from_github($content_item['raw_url']);
-                    file_put_contents(BLOG_CACHE_PATH.$content_item['path'], $file);
-                    // debug('file', $file);
-                    $content_item['sha'] = $item['sha'];
+                    if (($config['max_items'] == 0) || ($changed < $config['max_items'])) {
+                        $file = get_content_from_github($content_item['raw_url']);
+                        file_put_contents(BLOG_CACHE_PATH.$content_item['path'], $file);
+                        debug('file', $file);
+                        $content_item['sha'] = $item['sha'];
+                    }
                 }
             }
         } // if file
@@ -136,6 +134,12 @@ foreach ($directory as $key => $value) {
         echo("<p class=\"warning\">".BLOG_CACHE_PATH.$key." is not writable</p>\n");
     }
 }
+
+$rate_limit = json_decode(get_content_from_github("https://api.github.com/rate_limit"));
+// debug('rate_limit', $rate_limit);
+
+echo("<p>".$rate_limit->rate->remaining." hits remaining out of ".$rate_limit->rate->limit." for the next hour.</p>");
+
 ?>
 <form method="post">
 <input type="checkbox" name="force" value="yes" id="force_update" /> <label for="force_update">Force</label>
