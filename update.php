@@ -8,20 +8,31 @@ function debug($label, $value) {
 // phpinfo();
 // debug('server', $_SERVER);
 
-define('BLOG_CONFIG_PATH', 'config.json');
-define('BLOG_HTTP_URL', sprintf('http://%s%s', $_SERVER['SERVER_NAME'], pathinfo($_SERVER['REQUEST_URI'], PATHINFO_DIRNAME)));
+define('GITHUBGET_CONFIG_PATH', 'config.json');
 
-define('BLOG_MODREWRITE_ENABLED', true);
-define('BLOG_GITHUB_NOREQUEST', true); // for debugging purposes only
-define('BLOG_FORCE_UPDATE', true); // for debugging purposes only
-define('BLOG_STORE_NOUPDATE', false); // for debugging purposes only
 
-if (is_file(BLOG_CONFIG_PATH)) {
-    $config = json_decode(file_get_contents(BLOG_CONFIG_PATH), 1);
+define('GITHUBGET_MODREWRITE_ENABLED', true);
+// the following constants are useful for setup. they should all be set to false in production
+define('GITHUBGET_STORE_NODOWNLOAD', true); // for setup purposes only
+// the following constants are useful for testing. they should all be set to false in production
+define('GITHUBGET_GITHUB_NOREQUEST', true); // for debugging purposes only
+define('GITHUBGET_FORCE_UPDATE', true); // for debugging purposes only
+define('GITHUBGET_STORE_NOUPDATE', false); // for debugging purposes only
+
+if (is_file(GITHUBGET_CONFIG_PATH)) {
+    $config = json_decode(file_get_contents(GITHUBGET_CONFIG_PATH), 1);
 } else {
     header('Location: '.pathinfo($_SERVER['SCRIPT_NAME'], PATHINFO_DIRNAME).'/'.'install.php');
 }
-debug('config', $config);
+// debug('config', $config);
+
+define('GITHUBGET_CONTENT_PATH', $config['data_path'].'content.json');
+define('GITHUBGET_CACHE_PATH', $config['data_path'].'cache/');
+
+if (!is_writable($config['data_path'])) {
+    echo('<p class="warning">'.$config['data_path'].' is not writable.</p>');
+}
+
 ?>
 <html>
 <head>
@@ -36,8 +47,6 @@ debug('config', $config);
 if (file_exists('install.php')) {
     echo('<p class="warning">You should remove the <a href="install.php">install file</a>.</p>');
 }
-
-define('BLOG_CACHE_PATH', $config['data_path'].'cache/');
 
 function get_content_from_github($url) {
     $ch = curl_init();
@@ -62,7 +71,7 @@ function ensure_directory($path) {
         foreach (explode('/', $path) as $item) {
             $string .= $item.'/';
             if (!array_key_exists($string, $directory)) {
-                $result = is_dir(BLOG_CACHE_PATH.$string);
+                $result = is_dir(GITHUBGET_CACHE_PATH.$string);
                 $directory[$string] = $result;
             }
             
@@ -71,7 +80,7 @@ function ensure_directory($path) {
     return $result;
 } // ensure_directory()
 
-if (!BLOG_GITHUB_NOREQUEST) {
+if (!GITHUBGET_GITHUB_NOREQUEST) {
     $content_github = get_content_from_github($config['github_url']);
     file_put_contents("content_github.json", $content_github);
 } else {
@@ -79,19 +88,19 @@ if (!BLOG_GITHUB_NOREQUEST) {
     $content_github = file_get_contents("content_github.json");
 }
 $content_github = json_decode($content_github, true);
-debug('content_github', $content_github);
+// debug('content_github', $content_github);
 
 $content = array();
-if (!array_key_exists('force', $_REQUEST) && !BLOG_FORCE_UPDATE) {
-    if (file_exists(BLOG_CONTENT_PATH)) {
-        $content = file_get_contents(BLOG_CONTENT_PATH);
+if (!array_key_exists('force', $_REQUEST) && !GITHUBGET_FORCE_UPDATE) {
+    if (file_exists(GITHUBGET_CONTENT_PATH)) {
+        $content = file_get_contents(GITHUBGET_CONTENT_PATH);
         $content = json_decode($content, 1);
     }
     if (!is_array($content)) {
         $content = array();
     }
 }
-debug('content', $content);
+// debug('content', $content);
 
 
 $list = array();
@@ -113,25 +122,41 @@ if (is_array($content_github)) {
             $dirname = pathinfo($item['path'], PATHINFO_DIRNAME); // TODO: remove 'content/' which is $config['github_path']
             if (ensure_directory($dirname)) {
                 $content_item = $content[$id];
-                debug('content_item', $content_item);
-                debug('item', $item);
+                // debug('content_item', $content_item);
+                // debug('item', $item);
                 if ($item['sha'] != $content_item['sha']) {
                     $changed++;
-                    if (($config['max_items'] == 0) || ($changed < $config['max_items'])) {
-                        $file = get_content_from_github($content_item['raw_url']);
-                        file_put_contents(BLOG_CACHE_PATH.$content_item['path'], $file);
-                        debug('file', $file);
+                    if (($config['max_items'] == 0) || ($changed <= $config['max_items'])) {
+                        if (!GITHUBGET_STORE_NODOWNLOAD) {
+                            $file = get_content_from_github($content_item['raw_url']);
+                            file_put_contents(GITHUBGET_CACHE_PATH.$content_item['path'], $file);
+                        }
+                        // debug('file', $file);
                         $content_item['sha'] = $item['sha'];
+                        $content[$id]['sha'] = $item['sha'];
                     }
                 }
             }
         } // if file
     } // foreach
 } // is_array($content_github)
-debug('directory', $directory);
+// debug('content', $content);
+if (!GITHUBGET_STORE_NOUPDATE) {
+    // debug('GITHUBGET_CONTENT_PATH', GITHUBGET_CONTENT_PATH);
+    if (!file_exists(GITHUBGET_CONTENT_PATH) || is_writable(GITHUBGET_CONTENT_PATH)) {
+        $content_json = json_encode($content);
+        // debug('content_json', $content_json);
+        file_put_contents(GITHUBGET_CONTENT_PATH, json_encode($content));
+    } else {
+        echo('<p class="warning">Could not store content.json</p>');
+    }
+} else {
+    echo("<p class=\"warning\">I'm not storing the content.json</p>\n");
+}
+// debug('directory', $directory);
 foreach ($directory as $key => $value) {
     if (!$value) {
-        echo("<p class=\"warning\">".BLOG_CACHE_PATH.$key." is not writable</p>\n");
+        echo("<p class=\"warning\">".GITHUBGET_CACHE_PATH.$key." is not writable</p>\n");
     }
 }
 
