@@ -1,4 +1,4 @@
-# htdocs-get-github
+# get-github
 
 
 Synchronize a local directory with a GitHub repository.
