@@ -2,6 +2,11 @@
 
 ini_set('display_errors', '1');
 error_reporting(E_ALL);
+// phpinfo();
+
+if (!function_exists('json_encode')) {
+    include_once('simplejson.php');
+}
 
 function debug($label, $value) {
     echo("<p>$label<br /><pre>".htmlentities(print_r($value, 1))."</pre></p>");
@@ -48,18 +53,21 @@ if (array_key_exists('install', $_REQUEST)) {
     }
 
     if (empty($error)) {
-        define('BLOG_CONFIG_PATH', 'config.json');
-        define('BLOG_CONTENT_PATH', $config['data_path'].'content.json');
-        define('BLOG_LIST_PATH', $config['data_path'].'list.json');
-        define('BLOG_RSS_PATH', $config['data_path'].'blog.rss');
-        define('BLOG_CACHE_PATH', $config['data_path'].'cache/');
+        define('GITHUBGET_CONFIG_PATH', 'config/');
+        define('GITHUBGET_CONFIG_FILE', GITHUBGET_CONFIG_PATH.'config.json');
+        define('GITHUBGET_CONTENT_FILE', GITHUBGET_CONFIG_PATH.'content.json');
+        define('GITHUBGET_DATA_PATH', $config['data_path']);
 
-        if (!is_dir(BLOG_CACHE_PATH)) {
-            if (!@mkdir(BLOG_CACHE_PATH, 0777)) {
-                $error[] = "the ".BLOG_CACHE_PATH." directory does not exist and could not be created";
+        foreach (array(GITHUBGET_CONFIG_PATH, GITHUBGET_DATA_PATH) as $item) {
+            if (!is_dir($item)) {
+                if (!@mkdir($item, 0777)) {
+                    $error[] = "the ".$item." directory does not exist and could not be created";
+                }
+            } elseif (!is_writable($item)) {
+                $error[] = "the ".$item." directory is not writable";
             }
         }
-        foreach (array(BLOG_CONTENT_PATH, BLOG_LIST_PATH, BLOG_CONFIG_PATH, BLOG_RSS_PATH) as $item) {
+        foreach (array(GITHUBGET_CONTENT_FILE, GITHUBGET_CONFIG_FILE) as $item) {
             if (!is_file($item)) {
                 if (!@touch($item)) {
                     $error[] = "the ".$item." file does not exist and could not be created";
@@ -70,7 +78,7 @@ if (array_key_exists('install', $_REQUEST)) {
         }
     }
     if (empty($error)) {
-        file_put_contents("config.json", json_encode($config));
+        file_put_contents(GITHUBGET_CONFIG_PATH."config.json", json_encode($config));
     }
 }
 // if a config file exists
