@@ -20,12 +20,12 @@ define('GITHUBGET_CONFIG_FILE', GITHUBGET_CONFIG_PATH.'config.json');
 define('GITHUBGET_CONTENT_FILE', GITHUBGET_CONFIG_PATH.'content.json');
 
 // the following constants are useful for setup. they should all be set to false in production
-define('GITHUBGET_STORE_NODOWNLOAD', false); // for setup purposes only
-define('GITHUBGET_STORE_NODOWNLOADLIMIT', false); // for setup purposes only
+define('GITHUBGET_STORE_NODOWNLOADLIMIT', true); // for setup purposes only
 // the following constants are useful for testing. they should all be set to false in production
+define('GITHUBGET_STORE_NODOWNLOAD', true); // for setup or debugging purposes only
 define('GITHUBGET_GITHUB_NOREQUEST', false); // for debugging purposes only
 define('GITHUBGET_FORCE_UPDATE', false); // for debugging purposes only
-define('GITHUBGET_STORE_NOUPDATE', false); // for debugging purposes only
+define('GITHUBGET_STORE_NOUPDATE', true); // for debugging purposes only
 
 if (is_file(GITHUBGET_CONFIG_FILE)) {
     $config = json_decode(file_get_contents(GITHUBGET_CONFIG_FILE), 1);
@@ -115,6 +115,8 @@ if (empty($content)) {
 
 if (is_array($content_github)) {
     $changed = 0;
+    $list_current = array_keys($content);
+    debug('list', $list);
     foreach ($content_github as $item) {
         if ($item['type'] == 'file') {
             $id = $item['path'];
@@ -149,6 +151,8 @@ if (is_array($content_github)) {
             }
         } // if file
     } // foreach
+    $list_deleted = array_diff(array_key_exists($content), $list_current);
+    debug('list_deleted', $list_deleted);
 } // is_array($content_github)
 // debug('content', $content);
 if (($config['max_items'] > 0) && ($changed > $config['max_items']) && !GITHUBGET_STORE_NODOWNLOADLIMIT) {
