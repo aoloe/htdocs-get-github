@@ -44,7 +44,7 @@ if (!is_writable($config['data_path'])) {
 ?>
 <html>
 <head>
-<title><?= $config['title'] ?></title>
+<title>Update from <?= $config['github_repository'] ?></title>
 <style>
     .warning {background-color:yellow;}
 </style>
@@ -139,7 +139,7 @@ if (is_array($content_github)) {
                     if (($config['max_items'] == 0) || ($changed <= $config['max_items']) || GITHUBGET_STORE_NODOWNLOADLIMIT) {
                         if (!GITHUBGET_STORE_NODOWNLOAD) {
                             $file = get_content_from_github($content_item['raw_url']);
-                            if (!file_exists(GITHUBGET_DATA_PATH.$content_item['path']) || is_writable()) {
+                            if (!file_exists(GITHUBGET_DATA_PATH.$content_item['path']) || is_writable(GITHUBGET_DATA_PATH.$content_item['path'])) {
                                 file_put_contents(GITHUBGET_DATA_PATH.$content_item['path'], $file);
                             }
                             // debug('file', $file);
