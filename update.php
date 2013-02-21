@@ -116,7 +116,7 @@ if (empty($content)) {
 if (is_array($content_github)) {
     $changed = 0;
     $list_current = array_keys($content);
-    debug('list', $list);
+    // debug('list_current', $list_current);
     foreach ($content_github as $item) {
         if ($item['type'] == 'file') {
             $id = $item['path'];
@@ -151,8 +151,10 @@ if (is_array($content_github)) {
             }
         } // if file
     } // foreach
-    $list_deleted = array_diff(array_key_exists($content), $list_current);
-    debug('list_deleted', $list_deleted);
+    $list_deleted = array_diff(array_keys($content), $list_current);
+    if (!empty($list_deleted)) {
+        debug('list_deleted', $list_deleted);
+    }
 } // is_array($content_github)
 // debug('content', $content);
 if (($config['max_items'] > 0) && ($changed > $config['max_items']) && !GITHUBGET_STORE_NODOWNLOADLIMIT) {
