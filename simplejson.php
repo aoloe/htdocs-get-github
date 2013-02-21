@@ -119,14 +119,16 @@ function /* fromJSON */ json_decode ( $json, $assoc = false ) {
 /**
  * Encodes a PHP variable into a JSON string.
  * @param mixed $value A PHP variable to be encoded.
+ * @param int $options placeholder for the php options. for now, only escaping of slashes is implemented.
+ * (JSON_HEX_QUOT, JSON_HEX_TAG, JSON_HEX_AMP, JSON_HEX_APOS, JSON_NUMERIC_CHECK, JSON_PRETTY_PRINT, JSON_UNESCAPED_SLASHES, JSON_FORCE_OBJECT, JSON_UNESCAPED_UNICODE)
  */
-function /* toJSON */ json_encode ( $value ) {
+if (!defined('JSON_UNESCAPED_SLASHES')) define('JSON_UNESCAPED_SLASHES', 64);
+function /* toJSON */ json_encode ($value, $options = 0) {
 
   if ($value === null) { return 'null'; };  // gettype fails on null?
 
   $out = '';
-  // $esc = "\"\\/\n\r\t" . chr( 8 ) . chr( 12 );  // escaped chars
-  $esc = "\"\n\r\t" . chr( 8 ) . chr( 12 );  // escaped chars
+  $esc = "\"".($options == JSON_UNESCAPED_SLASHES ? "" : "\\/")."\n\r\t" . chr( 8 ) . chr( 12 );  // escaped chars
   $l   = '.';  // decimal point
   
   switch ( gettype( $value ) )
