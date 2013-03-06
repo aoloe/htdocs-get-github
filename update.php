@@ -22,10 +22,10 @@ define('GITHUBGET_CONTENT_FILE', GITHUBGET_CONFIG_PATH.'content.json');
 // the following constants are useful for setup. they should all be set to false in production
 define('GITHUBGET_STORE_NODOWNLOADLIMIT', true); // for setup purposes only
 // the following constants are useful for testing. they should all be set to false in production
-define('GITHUBGET_STORE_NODOWNLOAD', true); // for setup or debugging purposes only
+define('GITHUBGET_STORE_NODOWNLOAD', false); // for setup or debugging purposes only
 define('GITHUBGET_GITHUB_NOREQUEST', false); // for debugging purposes only
 define('GITHUBGET_FORCE_UPDATE', false); // for debugging purposes only
-define('GITHUBGET_STORE_NOUPDATE', true); // for debugging purposes only
+define('GITHUBGET_STORE_NOUPDATE', false); // for debugging purposes only
 
 if (is_file(GITHUBGET_CONFIG_FILE)) {
     $config = json_decode(file_get_contents(GITHUBGET_CONFIG_FILE), 1);
@@ -75,11 +75,15 @@ function ensure_directory($path) {
     global $directory;
     $result = true;
     $string = '';
-    if (!array_key_exists($path, $directory)) {
+    // debug('path', $path);
+    if (!array_key_exists((string) $path, $directory)) {
         foreach (explode('/', $path) as $item) {
             $string .= $item.'/';
             if (!array_key_exists($string, $directory)) {
                 $result = is_dir(GITHUBGET_DATA_PATH.$string);
+                if (!$result) {
+                    $result = mkdir(GITHUBGET_DATA_PATH.$string);
+                }
                 $directory[$string] = $result;
             }
             
@@ -88,17 +92,82 @@ function ensure_directory($path) {
     return $result;
 } // ensure_directory()
 
-if (!GITHUBGET_GITHUB_NOREQUEST) {
-    $content_github = get_content_from_github($config['github_url']);
-    file_put_contents(GITHUBGET_CONFIG_PATH."content_github.json", $content_github);
-} else {
-    echo('<p class="warning">Requests are from the cache: queries to GitHub are disabled.</p>');
-    $content_github = file_get_contents(GITHUBGET_CONFIG_PATH."content_github.json");
-}
-$content_github = json_decode($content_github, true);
-// debug('content_github', $content_github);
+/**
+ * @param array $config
+ * @param array $content
+ * @param string $path
+ * @param int $changed
+ * @return the number of changed element
+ */
+function read_content($config, & $content, & $list_github, $path = "", $changed = 0) {
 
-$content = array();
+    // debug('config', $config);
+    // debug('path', $path);
+
+    if (!GITHUBGET_GITHUB_NOREQUEST) {
+        $content_github = get_content_from_github($config['github_url'].($path == "" ? "" : "/".$path));
+        file_put_contents(GITHUBGET_CONFIG_PATH."content_github".($path == "" ? "" : "_".strtr($path, '/', '_')).".json", $content_github);
+    } else {
+        echo('<p class="warning">Requests are from the cache: queries to GitHub are disabled.</p>');
+        $content_github = file_get_contents(GITHUBGET_CONFIG_PATH."content_github".($path == "" ? "" : "_".$path).".json");
+    }
+    $content_github = json_decode($content_github, true);
+    // debug('content_github', $content_github);
+
+    $github_path_length = strlen($config['github_path']) + 1;
+
+    if (is_array($content_github)) {
+        $changed = 0;
+        // debug('list_current', $list_current);
+        // for removing $config['github_path']
+        foreach ($content_github as $item) {
+            if ($item['type'] == 'file') {
+                $id = substr($item['path'], $github_path_length);
+                $list_github[] = $id;
+                // debug('id', $id);
+                if (!array_key_exists($id, $content)) {
+                    $content[$id] = array (
+                        // remove $config['github_path']
+                        'path_github' => $item['path'],
+                        'path_data' => substr($item['path'], $github_path_length),
+                        'name' => $item['name'],
+                        'id' => $id,
+                        'raw_url' => $config['github_url_raw'].$item['path'],
+                        'sha' => '',
+                    );
+                }
+                $content_item = $content[$id];
+                // debug('content_item', $content_item);
+                // debug('path_data', $content_item['path_data']);
+                if (ensure_directory(dirname($content_item['path_data']))) {
+                    // debug('item', $item);
+                    if ($item['sha'] != $content_item['sha']) {
+                        $changed++;
+                        if (($config['max_items'] == 0) || ($changed <= $config['max_items']) || GITHUBGET_STORE_NODOWNLOADLIMIT) {
+                            if (!GITHUBGET_STORE_NODOWNLOAD) {
+                                $file = get_content_from_github($content_item['raw_url']);
+                                if (!file_exists(GITHUBGET_DATA_PATH.$content_item['path_data']) || is_writable(GITHUBGET_DATA_PATH.$content_item['path_data'])) {
+                                    file_put_contents(GITHUBGET_DATA_PATH.$content_item['path_data'], $file);
+                                }
+                                // debug('file', $file);
+                            }
+                            $content_item['sha'] = $item['sha'];
+                            $content[$id]['sha'] = $item['sha'];
+                        }
+                    }
+                }
+            } elseif ($item['type'] == 'dir') {
+                $dirname = substr($item['path'], $github_path_length);
+                if (ensure_directory($dirname)) {
+                    $changed  = read_content($config, $content, $list_github, $dirname, $changed);
+                }
+            } // if file
+        } // foreach
+    } // is_array($content_github)
+
+    return $changed;
+} // read_content()
+
 if (!array_key_exists('force', $_REQUEST) && !GITHUBGET_FORCE_UPDATE) {
     if (file_exists(GITHUBGET_CONTENT_FILE)) {
         $content = file_get_contents(GITHUBGET_CONTENT_FILE);
@@ -113,49 +182,31 @@ if (empty($content)) {
     echo('<p class="warning">There is no previous content.</p>');
 }
 
-if (is_array($content_github)) {
-    $changed = 0;
-    $list_current = array_keys($content);
-    // debug('list_current', $list_current);
-    foreach ($content_github as $item) {
-        if ($item['type'] == 'file') {
-            $id = $item['path'];
-            if (!array_key_exists($id, $content)) {
-                $content[$id] = array (
-                    'path' => $item['path'],
-                    'name' => $item['name'],
-                    'id' => $id,
-                    'raw_url' => $config['github_url_raw'].$item['path'],
-                    'sha' => '',
-                );
+$list_data = array_keys($content);
+
+$list_github = array();
+
+$changed = read_content($config, $content, $list_github);
+
+// debug('list_data', $list_data);
+// debug('list_github', $list_github);
+
+$list_deleted = array_diff($list_data, $list_github);
+if (!empty($list_deleted)) {
+    // debug('list_deleted', $list_deleted);
+    foreach($list_deleted as $item) {
+        // debug('content[deleted]', $content[$item]);
+        if (array_key_exists($item, $content)) {
+            if (!GITHUBGET_STORE_NODOWNLOAD ) {
+                unlink(GITHUBGET_DATA_PATH.$content[$item]['path_data']);
+            } else {
+                echo('<p class="warning">'.$item.' has not been removed.</p>');
             }
-            $dirname = pathinfo($item['path'], PATHINFO_DIRNAME); // TODO: remove 'content/' which is $config['github_path']
-            if (ensure_directory($dirname)) {
-                $content_item = $content[$id];
-                // debug('content_item', $content_item);
-                // debug('item', $item);
-                if ($item['sha'] != $content_item['sha']) {
-                    $changed++;
-                    if (($config['max_items'] == 0) || ($changed <= $config['max_items']) || GITHUBGET_STORE_NODOWNLOADLIMIT) {
-                        if (!GITHUBGET_STORE_NODOWNLOAD) {
-                            $file = get_content_from_github($content_item['raw_url']);
-                            if (!file_exists(GITHUBGET_DATA_PATH.$content_item['path']) || is_writable(GITHUBGET_DATA_PATH.$content_item['path'])) {
-                                file_put_contents(GITHUBGET_DATA_PATH.$content_item['path'], $file);
-                            }
-                            // debug('file', $file);
-                        }
-                        $content_item['sha'] = $item['sha'];
-                        $content[$id]['sha'] = $item['sha'];
-                    }
-                }
-            }
-        } // if file
-    } // foreach
-    $list_deleted = array_diff(array_keys($content), $list_current);
-    if (!empty($list_deleted)) {
-        debug('list_deleted', $list_deleted);
+            unset($content[$item]);
+        }
     }
-} // is_array($content_github)
+}
+
 // debug('content', $content);
 if (($config['max_items'] > 0) && ($changed > $config['max_items']) && !GITHUBGET_STORE_NODOWNLOADLIMIT) {
     echo('<p class="warning">Updated '.$config['max_items'].' items; '.($changed - $config['max_items']).' items still need an update.</p>');

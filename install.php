@@ -23,6 +23,10 @@ $field = array(
 $config = array_fill_keys(array_keys($field), '');
 $config['data_path'] = 'data/';
 
+define('GITHUBGET_CONFIG_PATH', 'config/');
+define('GITHUBGET_CONFIG_FILE', GITHUBGET_CONFIG_PATH.'config.json');
+define('GITHUBGET_CONTENT_FILE', GITHUBGET_CONFIG_PATH.'content.json');
+
 // debug('_REQUEST', $_REQUEST);
 if (array_key_exists('install', $_REQUEST)) {
 
@@ -53,12 +57,7 @@ if (array_key_exists('install', $_REQUEST)) {
     }
 
     if (empty($error)) {
-        define('GITHUBGET_CONFIG_PATH', 'config/');
-        define('GITHUBGET_CONFIG_FILE', GITHUBGET_CONFIG_PATH.'config.json');
-        define('GITHUBGET_CONTENT_FILE', GITHUBGET_CONFIG_PATH.'content.json');
-        define('GITHUBGET_DATA_PATH', $config['data_path']);
-
-        foreach (array(GITHUBGET_CONFIG_PATH, GITHUBGET_DATA_PATH) as $item) {
+        foreach (array(GITHUBGET_CONFIG_PATH, $config['data_path']) as $item) {
             if (!is_dir($item)) {
                 if (!@mkdir($item, 0777)) {
                     $error[] = "the ".$item." directory does not exist and could not be created";
@@ -78,14 +77,13 @@ if (array_key_exists('install', $_REQUEST)) {
         }
     }
     if (empty($error)) {
-        file_put_contents(GITHUBGET_CONFIG_PATH."config.json", json_encode($config));
+        file_put_contents(GITHUBGET_CONFIG_FILE, json_encode($config));
+    }
+} else {
+    if (is_readable(GITHUBGET_CONFIG_FILE)) {
+        $config = json_decode(file_get_contents(GITHUBGET_CONFIG_FILE), 1);
     }
 }
-// if a config file exists
-if (empty($_REQUEST) && empty($error) && ($config['github_user'] == '') && file_exists("config.json")) {
-    $config = json_decode(file_get_contents("config.json"), true);
-}
-// debug('config', $config);
 
 ?>
 <html>
