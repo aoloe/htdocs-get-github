@@ -28,7 +28,7 @@ define('GITHUBGET_FORCE_UPDATE', false); // for debugging purposes only
 define('GITHUBGET_STORE_NOUPDATE', false); // for debugging purposes only
 
 if (is_file(GITHUBGET_CONFIG_FILE)) {
-    $config = json_decode(file_get_contents(GITHUBGET_CONFIG_FILE), 1);
+    $config = json_decode(stripslashes(file_get_contents(GITHUBGET_CONFIG_FILE)), 1);
 } else {
     header('Location: '.pathinfo($_SERVER['SCRIPT_NAME'], PATHINFO_DIRNAME).'/'.'install.php');
 }
@@ -57,6 +57,7 @@ if (file_exists('install.php')) {
 }
 
 function get_content_from_github($url) {
+    // debug('url', $url);
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
@@ -114,7 +115,7 @@ function read_content($config, & $content, & $list_github, $path = "", $changed 
     $content_github = json_decode($content_github, true);
     // debug('content_github', $content_github);
 
-    $github_path_length = strlen($config['github_path']) + 1;
+    $github_path_length = strlen($config['github_path']);
 
     if (is_array($content_github)) {
         $changed = 0;
@@ -143,16 +144,23 @@ function read_content($config, & $content, & $list_github, $path = "", $changed 
                     // debug('item', $item);
                     if ($item['sha'] != $content_item['sha']) {
                         $changed++;
+                        $downloaded = false;
                         if (($config['max_items'] == 0) || ($changed <= $config['max_items']) || GITHUBGET_STORE_NODOWNLOADLIMIT) {
                             if (!GITHUBGET_STORE_NODOWNLOAD) {
                                 $file = get_content_from_github($content_item['raw_url']);
-                                if (!file_exists(GITHUBGET_DATA_PATH.$content_item['path_data']) || is_writable(GITHUBGET_DATA_PATH.$content_item['path_data'])) {
-                                    file_put_contents(GITHUBGET_DATA_PATH.$content_item['path_data'], $file);
+                                // if file contains a timeout error or another github message, ignore it
+                                if (strpos($file, 'Hello future GitHubber!') === false) {
+                                    if (!file_exists(GITHUBGET_DATA_PATH.$content_item['path_data']) || is_writable(GITHUBGET_DATA_PATH.$content_item['path_data'])) {
+                                        file_put_contents(GITHUBGET_DATA_PATH.$content_item['path_data'], $file);
+                                        $downloaded = true;
+                                    }
                                 }
                                 // debug('file', $file);
                             }
-                            $content_item['sha'] = $item['sha'];
-                            $content[$id]['sha'] = $item['sha'];
+                            if ($downloaded) {
+                                $content_item['sha'] = $item['sha'];
+                                $content[$id]['sha'] = $item['sha'];
+                            }
                         }
                     }
                 }
@@ -168,6 +176,7 @@ function read_content($config, & $content, & $list_github, $path = "", $changed 
     return $changed;
 } // read_content()
 
+$content = null;
 if (!array_key_exists('force', $_REQUEST) && !GITHUBGET_FORCE_UPDATE) {
     if (file_exists(GITHUBGET_CONTENT_FILE)) {
         $content = file_get_contents(GITHUBGET_CONTENT_FILE);
