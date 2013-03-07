@@ -19,6 +19,8 @@ define('GITHUBGET_CONFIG_PATH', 'config/');
 define('GITHUBGET_CONFIG_FILE', GITHUBGET_CONFIG_PATH.'config.json');
 define('GITHUBGET_CONTENT_FILE', GITHUBGET_CONFIG_PATH.'content.json');
 
+define('GITHUBGET_STRIPSLASHES', true);
+
 // the following constants are useful for setup. they should all be set to false in production
 define('GITHUBGET_STORE_NODOWNLOADLIMIT', true); // for setup purposes only
 // the following constants are useful for testing. they should all be set to false in production
@@ -28,7 +30,12 @@ define('GITHUBGET_FORCE_UPDATE', false); // for debugging purposes only
 define('GITHUBGET_STORE_NOUPDATE', false); // for debugging purposes only
 
 if (is_file(GITHUBGET_CONFIG_FILE)) {
-    $config = json_decode(stripslashes(file_get_contents(GITHUBGET_CONFIG_FILE)), 1);
+    $config = file_get_contents(GITHUBGET_CONFIG_FILE);
+    if (GITHUBGET_STRIPSLASHES) {
+        $config = stripslashes($config);
+    }
+    $config = json_decode($config, true);
+
 } else {
     header('Location: '.pathinfo($_SERVER['SCRIPT_NAME'], PATHINFO_DIRNAME).'/'.'install.php');
 }
@@ -112,6 +119,9 @@ function read_content($config, & $content, & $list_github, $path = "", $changed 
         echo('<p class="warning">Requests are from the cache: queries to GitHub are disabled.</p>');
         $content_github = file_get_contents(GITHUBGET_CONFIG_PATH."content_github".($path == "" ? "" : "_".$path).".json");
     }
+    if (GITHUBGET_STRIPSLASHES) {
+        $content_github = stripslashes($content_github);
+    }
     $content_github = json_decode($content_github, true);
     // debug('content_github', $content_github);
 
@@ -180,13 +190,19 @@ $content = null;
 if (!array_key_exists('force', $_REQUEST) && !GITHUBGET_FORCE_UPDATE) {
     if (file_exists(GITHUBGET_CONTENT_FILE)) {
         $content = file_get_contents(GITHUBGET_CONTENT_FILE);
-        $content = json_decode($content, 1);
+        // debug('content', $content);
+        if (GITHUBGET_STRIPSLASHES) {
+            $content = stripslashes($content);
+        }
+        $content = json_decode($content, true);
+        // debug('content', $content);
     }
     if (!is_array($content)) {
         $content = array();
     }
 }
 // debug('content', $content);
+// die();
 if (empty($content)) {
     echo('<p class="warning">There is no previous content.</p>');
 }
@@ -224,9 +240,9 @@ if (($config['max_items'] > 0) && ($changed > $config['max_items']) && !GITHUBGE
 }
 if (!GITHUBGET_STORE_NOUPDATE) {
     if (!file_exists(GITHUBGET_CONTENT_FILE) || is_writable(GITHUBGET_CONTENT_FILE)) {
-        $content_json = json_encode($content);
-        // debug('content_json', $content_json);
-        file_put_contents(GITHUBGET_CONTENT_FILE, json_encode($content));
+        $content = json_encode($content);
+        // debug('content', $content);
+        file_put_contents(GITHUBGET_CONTENT_FILE, $content);
     } else {
         echo('<p class="warning">Could not store content.json</p>');
     }

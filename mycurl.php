@@ -118,6 +118,9 @@ class MyCurl
 		
 		$host = $this->get_host($url);
 		$query = $this->get_query($url);
+        // debug('url', $url);
+        // debug('host', $host);
+        // debug('query', $query);
 		
 		if ($this->proxy["host"]) {
 			$fp = fsockopen($this->proxy["host"], $this->proxy["port"], $errno, $errstr, $this->timeout);
